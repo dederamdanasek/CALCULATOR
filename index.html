@@ -39,8 +39,6 @@
                 <th>Process ID</th>
                 <th>Arrival Time</th>
                 <th>Burst Time</th>
-                <th id="priorityHeader" style="display: none;">Priority</th>
-                <th id="queueHeader" style="display: none;">Queue (For MLQ)</th>
             </tr>
         </thead>
         <tbody id="processBody"></tbody>
@@ -67,6 +65,11 @@
     <script>
         let processes = [];
 
+        function updateTableHeaders() {
+            let algo = document.getElementById("algorithm").value;
+            document.getElementById("timeQuantumDiv").style.display = algo === "round_robin" ? "block" : "none";
+        }
+
         function addProcess() {
             let table = document.getElementById("processBody");
             let id = processes.length + 1;
@@ -78,6 +81,7 @@
         }
 
         function calculateScheduling() {
+            let algorithm = document.getElementById("algorithm").value;
             let inputProcesses = processes.map(p => ({
                 id: "P" + p.id,
                 arrival: parseInt(document.getElementById(`arrival${p.id}`).value) || 0,
@@ -85,38 +89,58 @@
             }));
             inputProcesses.sort((a, b) => a.arrival - b.arrival);
             
+            if (algorithm === "round_robin") {
+                let timeQuantum = parseInt(document.getElementById("timeQuantum").value) || 2;
+                roundRobinScheduling(inputProcesses, timeQuantum);
+            }
+        }
+
+        function roundRobinScheduling(processes, quantum) {
+            let queue = [...processes];
             let currentTime = 0;
             let ganttChart = "";
             let resultBody = document.getElementById("resultBody");
             resultBody.innerHTML = "";
+            let waitingTimes = {};
+            let turnaroundTimes = {};
+            let remainingBursts = {};
+            processes.forEach(p => remainingBursts[p.id] = p.burst);
+            
+            while (queue.length > 0) {
+                let process = queue.shift();
+                let executeTime = Math.min(quantum, remainingBursts[process.id]);
+                let startTime = currentTime;
+                let finishTime = currentTime + executeTime;
+                remainingBursts[process.id] -= executeTime;
+                currentTime = finishTime;
+                ganttChart += `<span class='gantt-bar'>${process.id} (${startTime}-${finishTime})</span>`;
+                
+                if (remainingBursts[process.id] > 0) {
+                    queue.push(process);
+                } else {
+                    turnaroundTimes[process.id] = finishTime - process.arrival;
+                    waitingTimes[process.id] = turnaroundTimes[process.id] - process.burst;
+                }
+            }
+            
             let totalWaitingTime = 0;
             let totalTurnaroundTime = 0;
-            
-            inputProcesses.forEach(p => {
-                let startTime = Math.max(currentTime, p.arrival);
-                let finishTime = startTime + p.burst;
-                let waitingTime = startTime - p.arrival;
-                let turnaroundTime = finishTime - p.arrival;
-                totalWaitingTime += waitingTime;
-                totalTurnaroundTime += turnaroundTime;
-                
-                ganttChart += `<span class='gantt-bar'>${p.id} (${startTime}-${finishTime})</span>`;
-                
+            processes.forEach(p => {
                 let row = resultBody.insertRow();
                 row.insertCell(0).innerText = p.id;
                 row.insertCell(1).innerText = p.arrival;
                 row.insertCell(2).innerText = p.burst;
-                row.insertCell(3).innerText = startTime;
-                row.insertCell(4).innerText = finishTime;
-                row.insertCell(5).innerText = waitingTime;
-                row.insertCell(6).innerText = turnaroundTime;
-                
-                currentTime = finishTime;
+                row.insertCell(3).innerText = p.arrival;
+                row.insertCell(4).innerText = turnaroundTimes[p.id] + p.arrival;
+                row.insertCell(5).innerText = waitingTimes[p.id];
+                row.insertCell(6).innerText = turnaroundTimes[p.id];
+                totalWaitingTime += waitingTimes[p.id];
+                totalTurnaroundTime += turnaroundTimes[p.id];
             });
             
             document.getElementById("ganttChart").innerHTML = ganttChart;
-            document.getElementById("avgWaitingTime").innerText = (totalWaitingTime / inputProcesses.length).toFixed(2);
-            document.getElementById("avgTurnaroundTime").innerText = (totalTurnaroundTime / inputProcesses.length).toFixed(2);
+            document.getElementById("avgWaitingTime").innerText = (totalWaitingTime / processes.length).toFixed(2);
+            document.getElementById("avgTurnaroundTime").innerText = (totalTurnaroundTime / processes.length).toFixed(2);
         }
     </script>
 </body>
