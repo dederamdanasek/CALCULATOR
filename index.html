@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CPU Scheduling Calculator</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid black; padding: 8px; text-align: center; }
+        th { background-color: #f2f2f2; }
+        .gantt-bar { display: inline-block; padding: 10px; margin: 2px; border-radius: 5px; background-color: lightblue; }
+        #steps, #results { margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h2>CPU Scheduling Calculator</h2>
+    <label for="algorithm">Choose Scheduling Algorithm:</label>
+    <select id="algorithm" onchange="updateTableHeaders()">
+        <option value="fcfs">FCFS</option>
+        <option value="sjf_np">SJF Non-Preemptive</option>
+        <option value="sjf_p">SJF Preemptive</option>
+        <option value="priority_np">Priority Non-Preemptive</option>
+        <option value="priority_p">Priority Preemptive</option>
+        <option value="round_robin">Round Robin</option>
+        <option value="mlq">MLQ</option>
+    </select>
+    <br><br>
+    <div id="timeQuantumDiv" style="display: none;">
+        <label for="timeQuantum">Time Quantum (for Round Robin):</label>
+        <input type="number" id="timeQuantum" min="1">
+    </div>
+    <br>
+    <button onclick="addProcess()">Add Process</button>
+    <button onclick="calculateScheduling()">Calculate</button>
+    <table id="processTable">
+        <thead>
+            <tr>
+                <th>Process ID</th>
+                <th>Arrival Time</th>
+                <th>Burst Time</th>
+                <th id="priorityHeader" style="display: none;">Priority</th>
+                <th id="queueHeader" style="display: none;">Queue (For MLQ)</th>
+            </tr>
+        </thead>
+        <tbody id="processBody"></tbody>
+    </table>
+    <h3>Gantt Chart:</h3>
+    <div id="ganttChart"></div>
+    <h3>Results:</h3>
+    <table id="results">
+        <thead>
+            <tr>
+                <th>Process</th>
+                <th>Arrival Time</th>
+                <th>Burst Time</th>
+                <th>Start Time</th>
+                <th>Finish Time</th>
+                <th>Waiting Time</th>
+                <th>Turnaround Time</th>
+            </tr>
+        </thead>
+        <tbody id="resultBody"></tbody>
+    </table>
+    <h3>Average Waiting Time: <span id="avgWaitingTime"></span></h3>
+    <h3>Average Turnaround Time: <span id="avgTurnaroundTime"></span></h3>
+    <script>
+        let processes = [];
+
+        function addProcess() {
+            let table = document.getElementById("processBody");
+            let id = processes.length + 1;
+            let row = table.insertRow();
+            row.insertCell(0).innerText = "P" + id;
+            row.insertCell(1).innerHTML = `<input type='number' min='0' id='arrival${id}'>`;
+            row.insertCell(2).innerHTML = `<input type='number' min='1' id='burst${id}'>`;
+            processes.push({ id });
+        }
+
+        function calculateScheduling() {
+            let inputProcesses = processes.map(p => ({
+                id: "P" + p.id,
+                arrival: parseInt(document.getElementById(`arrival${p.id}`).value) || 0,
+                burst: parseInt(document.getElementById(`burst${p.id}`).value) || 1
+            }));
+            inputProcesses.sort((a, b) => a.arrival - b.arrival);
+            
+            let currentTime = 0;
+            let ganttChart = "";
+            let resultBody = document.getElementById("resultBody");
+            resultBody.innerHTML = "";
+            let totalWaitingTime = 0;
+            let totalTurnaroundTime = 0;
+            
+            inputProcesses.forEach(p => {
+                let startTime = Math.max(currentTime, p.arrival);
+                let finishTime = startTime + p.burst;
+                let waitingTime = startTime - p.arrival;
+                let turnaroundTime = finishTime - p.arrival;
+                totalWaitingTime += waitingTime;
+                totalTurnaroundTime += turnaroundTime;
+                
+                ganttChart += `<span class='gantt-bar'>${p.id} (${startTime}-${finishTime})</span>`;
+                
+                let row = resultBody.insertRow();
+                row.insertCell(0).innerText = p.id;
+                row.insertCell(1).innerText = p.arrival;
+                row.insertCell(2).innerText = p.burst;
+                row.insertCell(3).innerText = startTime;
+                row.insertCell(4).innerText = finishTime;
+                row.insertCell(5).innerText = waitingTime;
+                row.insertCell(6).innerText = turnaroundTime;
+                
+                currentTime = finishTime;
+            });
+            
+            document.getElementById("ganttChart").innerHTML = ganttChart;
+            document.getElementById("avgWaitingTime").innerText = (totalWaitingTime / inputProcesses.length).toFixed(2);
+            document.getElementById("avgTurnaroundTime").innerText = (totalTurnaroundTime / inputProcesses.length).toFixed(2);
+        }
+    </script>
+</body>
+</html>
